@@ -32,6 +32,7 @@ int main(int argc, char **argv)
     int cux = 0, cuy = 0;
     int bx = 0, by = 0;
     int t;
+    int blkcorner, blkcorner_x, blkcorner_y, direction;
     /***********************************************************************/
 
     cpu_time();
@@ -163,7 +164,61 @@ int main(int argc, char **argv)
                     else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
                     {
                         //blk boundary
-                        get_fvector(dec, i, j, sig_gain, fvector_blk);
+
+                        //ブロックの隅であるとき
+        								if( (j == bx && i == by && j != 0 && i != 0)
+        								||(j == bx && i == by + h - 1 && j != 0 && i != org->height-1)
+        								||(j == bx + w - 1 && i == by && j != org->width-1 && i != 0)
+        								||(j == bx + w - 1 && i == by + h - 1 && j != org->width-1 && i != org->height-1))
+        								{
+        									blkcorner_x = j % 4;
+        									blkcorner_y = i % 4;
+        									switch(blkcorner_x){
+        										case 0:
+        										if(blkcorner_y == 0){blkcorner = 1;}//左上
+        										else{blkcorner = 3;}//左下
+        										break;
+        										case 3:
+        										if(blkcorner_y == 0){blkcorner = 2;}//右上
+        										else{blkcorner = 4;}//右下
+        										break;
+        									}
+        									direction = slope(org, i, j, blkcorner)
+        								}
+
+        								//境界線方向：horizon上
+        								if( (i == by && i != 0 && j != bx && j != bx + w - 1)
+        								||(i == by && i != 0 && j == 0)
+        								||(i == by && i != 0 && j == org->width-1))
+        								{
+        									direction = 0;
+        								}
+
+        								//境界線方向：horizon下
+        								else if( (i == by + h - 1 && i != org->height-1 && j != bx && j != bx + w - 1)//yokosita
+        								||(i == by + h - 1 && i != org->height-1 && j == 0)
+        								||(i == by + h - 1 && i != org->height-1 && j == org->width-1))
+        								{
+        									direction = 2;
+        								}
+
+        								//境界線方向：vertical右
+        								else if(  (j == bx + w - 1 && j != org->width-1 && i != by && i != by + h -1)//tatemigi
+        								||(j == bx + w - 1 && j != org->width-1 && i == 0)
+        								||(j == bx + w - 1 && j != org->width-1 && i == org->height-1))
+        								{
+        									direction = 1;
+        								}
+
+        								//境界線方向：vertical左
+        								else if((j == bx && j != 0 && i != by && i != by + h - 1)//tatehidari
+        								||(j == bx && j != 0 && i == 0)
+        								||(j == bx && j != 0 && i == org->height-1))
+        								{
+        									direction = 3;
+        								}
+
+                        get_fvector_blk(dec, i, j, sig_gain, fvector_blk, direction);
                         t = 0;
                         for (k = 0; k < NUM_FEATURES; k++)
                         {
@@ -189,7 +244,7 @@ int main(int argc, char **argv)
         }
         fprintf(stderr, ".");
     }
-    
+
     fprintf(stderr, "\n");
     fclose(TUinfo);
 

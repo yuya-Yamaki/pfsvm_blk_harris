@@ -28,7 +28,7 @@ struct svm_node *x_space_blk;
 
 int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_list)
 {
-#ifdef LEAVE_ONE_OUT
+	#ifdef LEAVE_ONE_OUT
 	FILE *fp;
 	DIR *dir;
 	struct dirent *dp;
@@ -43,7 +43,7 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 	while ((dp = readdir(dir)) != NULL)
 	{
 		if (strncmp(dp->d_name + strlen(dp->d_name) - 4, ".pgm", 4) != 0)
-			continue;
+		continue;
 		strncpy(org_img, org_dir, 255);
 		if (org_img[strlen(org_img) - 1] != '/')
 		{
@@ -58,7 +58,7 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 		strcat(dec_img, dp->d_name);
 		strcpy(dec_img + strlen(dec_img) - 4, "-dec.pgm");
 		if ((fp = fopen(dec_img, "r")) == NULL)
-			continue;
+		continue;
 		fclose(fp);
 		printf("%s %s\n", org_img, dec_img);
 		oimg_list[num_img] = read_pgm(org_img);
@@ -66,11 +66,11 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 		num_img++;
 	}
 	return (num_img);
-#else
+	#else
 	oimg_list[0] = read_pgm(org_dir);
 	dimg_list[0] = read_pgm(dec_dir);
 	return (1);
-#endif
+	#endif
 }
 
 int main(int argc, char **argv)
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 		{
 			switch (argv[i][1])
 			{
-			case 'L':
+				case 'L':
 				num_class = atoi(argv[++i]);
 				if (num_class < 3 || num_class > MAX_CLASS || (num_class % 2) == 0)
 				{
@@ -119,16 +119,16 @@ int main(int argc, char **argv)
 					exit(1);
 				}
 				break;
-			case 'C':
+				case 'C':
 				svm_c = atof(argv[++i]);
 				break;
-			case 'G':
+				case 'G':
 				svm_gamma = atof(argv[++i]);
 				break;
-			case 'S':
+				case 'S':
 				sig_gain = atof(argv[++i]);
 				break;
-			default:
+				default:
 				fprintf(stderr, "Unknown option: %s!\n", argv[i]);
 				exit(1);
 			}
@@ -155,12 +155,12 @@ int main(int argc, char **argv)
 	}
 	if (modelfile == NULL || modelfile_blk == NULL)
 	{
-#ifdef LEAVE_ONE_OUT
+		#ifdef LEAVE_ONE_OUT
 		printf("Usage: %s [options] original_dir decoded_dir model.svm model_blk.svm\n",
-#else
+		#else
 		printf("Usage: %s [options] original.pgm decoded.pgm model.svm model_blk.svm\n",
-#endif
-			   argv[0]);
+		#endif
+		argv[0]);
 		printf("    -L num  The number of classes [%d]\n", num_class);
 		printf("    -C num  Penalty parameter for SVM [%f]\n", svm_c);
 		printf("    -G num  Gamma parameter for SVM [%f]\n", svm_gamma);
@@ -351,11 +351,64 @@ int main(int argc, char **argv)
 							{
 								//blk boundary
 
+								//ブロックの隅であるとき
+								if( (j == bx && i == by && j != 0 && i != 0)
+								||(j == bx && i == by + h - 1 && j != 0 && i != org->height-1)
+								||(j == bx + w - 1 && i == by && j != org->width-1 && i != 0)
+								||(j == bx + w - 1 && i == by + h - 1 && j != org->width-1 && i != org->height-1))
+								{
+									blkcorner_x = j % 4;
+									blkcorner_y = i % 4;
+									switch(blkcorner_x){
+										case 0:
+										if(blkcorner_y == 0){blkcorner = 1;}//左上
+										else{blkcorner = 3;}//左下
+										break;
+										case 3:
+										if(blkcorner_y == 0){blkcorner = 2;}//右上
+										else{blkcorner = 4;}//右下
+										break;
+									}
+									direction = slope(org, i, j, blkcorner)
+								}
+
+								//境界線方向：horizon上
+								if( (i == by && i != 0 && j != bx && j != bx + w - 1)
+								||(i == by && i != 0 && j == 0)
+								||(i == by && i != 0 && j == org->width-1))
+								{
+									direction = 0;
+								}
+
+								//境界線方向：horizon下
+								else if( (i == by + h - 1 && i != org->height-1 && j != bx && j != bx + w - 1)//yokosita
+								||(i == by + h - 1 && i != org->height-1 && j == 0)
+								||(i == by + h - 1 && i != org->height-1 && j == org->width-1))
+								{
+									direction = 2;
+								}
+
+								//境界線方向：vertical右
+								else if(  (j == bx + w - 1 && j != org->width-1 && i != by && i != by + h -1)//tatemigi
+								||(j == bx + w - 1 && j != org->width-1 && i == 0)
+								||(j == bx + w - 1 && j != org->width-1 && i == org->height-1))
+								{
+									direction = 1;
+								}
+
+								//境界線方向：vertical左
+								else if((j == bx && j != 0 && i != by && i != by + h - 1)//tatehidari
+								||(j == bx && j != 0 && i == 0)
+								||(j == bx && j != 0 && i == org->height-1))
+								{
+									direction = 3;
+								}
+
 								label = get_label(org, dec, i, j, num_class, th_list_blk);
 								cls_blk[label]++;
 								prob_blk.y[s] = label;
 								prob_blk.x[s] = &x_space_blk[t];
-								get_fvector(dec, i, j, sig_gain, fvector_blk);
+								get_fvector_blk(dec, i, j, sig_gain, fvector_blk, direction);
 								for (k = 0; k < NUM_FEATURES; k++)
 								{
 									if (fvector_blk[k] != 0.0)

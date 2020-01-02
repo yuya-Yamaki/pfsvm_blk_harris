@@ -31,4 +31,6 @@ double cpu_time(void);
 
 /****************************blk information****************************/
 void set_thresholds_blk(IMAGE **, IMAGE **, int, int, double *, double *);
+int get_fvector_blk(IMAGE *, int, int, double, double *, int);
+int slope(IMAGE *, int, int, int);
 /***********************************************************************/
