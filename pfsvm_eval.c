@@ -32,8 +32,13 @@ int main(int argc, char **argv)
     int cux = 0, cuy = 0;
     int bx = 0, by = 0;
     int t;
-    int blkcorner, blkcorner_x, blkcorner_y, direction;
+    int blkcorner = 0, blkcorner_x = 0, blkcorner_y = 0, direction = 0;
     /***********************************************************************/
+
+    /****************harris*****************/
+    HARRIS *harris;
+    HARRIS *harris_list[1];
+    /***************************************/
 
     cpu_time();
     setbuf(stdout, 0);
@@ -86,15 +91,22 @@ int main(int argc, char **argv)
     org = read_pgm(orgimg);
     dec = read_pgm(decimg);
     cls = alloc_image(org->width, org->height, 255);
-    if ((model = svm_load_model(modelfile)) == 0 || (model_blk = svm_load_model(modelfile_blk)) == 0 )
+    if ((model = svm_load_model(modelfile)) == 0 || (model_blk = svm_load_model(modelfile_blk)) == 0)
     {
         fprintf(stderr, "can't open model file %s %s\n", modelfile, modelfile_blk);
         exit(1);
     }
 
+    /*******************harris********************/
+    harris = (HARRIS *)calloc(1, sizeof(HARRIS));
+    //set_harris(harris, harris_list, &org, 1);
+    set_harris_for_check(harris, harris_list, &dec, 1);
+    harris = harris_list[0];
+    /********************************************/
+
     num_class = model->nr_class;
     /*何パーセント正確をはかるためにあるプログラムで実際いらない部分***************************/
-    set_thresholds_blk(&org, &dec, 1, num_class, th_list, th_list_blk);
+    set_thresholds_blk_harris(&org, &dec, 1, num_class, th_list, th_list_blk, harris_list);
     printf("PSNR = %.2f (dB)\n", sn_before = calc_snr(org, dec));
     printf("# of classes = %d\n", num_class);
     printf("Thresholds in blk = {%.1f", th_list[0]);
@@ -137,7 +149,7 @@ int main(int argc, char **argv)
             {
                 for (j = bx; j < bx + w; j++)
                 {
-                    if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+                    if ((((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx)) && (harris->bool_h[i][j] == 0))
                     {
                         //in blk
                         get_fvector(dec, i, j, sig_gain, fvector);
@@ -161,62 +173,71 @@ int main(int argc, char **argv)
                         offset[label] += org->val[i][j] - dec->val[i][j];
                         cls_hist[label]++;
                     }
-                    else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
+                    else if (((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0)) || (harris->bool_h[i][j] == 1))
                     {
                         //blk boundary
-
                         //ブロックの隅であるとき
-        								if( (j == bx && i == by && j != 0 && i != 0)
-        								||(j == bx && i == by + h - 1 && j != 0 && i != org->height-1)
-        								||(j == bx + w - 1 && i == by && j != org->width-1 && i != 0)
-        								||(j == bx + w - 1 && i == by + h - 1 && j != org->width-1 && i != org->height-1))
-        								{
-        									blkcorner_x = j % 4;
-        									blkcorner_y = i % 4;
-        									switch(blkcorner_x){
-        										case 0:
-        										if(blkcorner_y == 0){blkcorner = 1;}//左上
-        										else{blkcorner = 3;}//左下
-        										break;
-        										case 3:
-        										if(blkcorner_y == 0){blkcorner = 2;}//右上
-        										else{blkcorner = 4;}//右下
-        										break;
-        									}
-        									direction = slope(org, i, j, blkcorner)
-        								}
+                        if ((j == bx && i == by && j != 0 && i != 0) || (j == bx && i == by + h - 1 && j != 0 && i != org->height - 1) || (j == bx + w - 1 && i == by && j != org->width - 1 && i != 0) || (j == bx + w - 1 && i == by + h - 1 && j != org->width - 1 && i != org->height - 1))
+                        {
+                            blkcorner_x = j % 4;
+                            blkcorner_y = i % 4;
+                            switch (blkcorner_x)
+                            {
+                            case 0:
+                                if (blkcorner_y == 0)
+                                {
+                                    blkcorner = 1;
+                                } //左上
+                                else
+                                {
+                                    blkcorner = 3;
+                                } //左下
+                                break;
+                            case 3:
+                                if (blkcorner_y == 0)
+                                {
+                                    blkcorner = 2;
+                                } //右上
+                                else
+                                {
+                                    blkcorner = 4;
+                                } //右下
+                                break;
+                            }
+                            direction = slope(org, i, j, blkcorner);
+                        }
 
-        								//境界線方向：horizon上
-        								if( (i == by && i != 0 && j != bx && j != bx + w - 1)
-        								||(i == by && i != 0 && j == 0)
-        								||(i == by && i != 0 && j == org->width-1))
-        								{
-        									direction = 0;
-        								}
+                        //境界線方向：horizon上
+                        else if ((i == by && i != 0 && j != bx && j != bx + w - 1) || (i == by && i != 0 && j == 0) || (i == by && i != 0 && j == org->width - 1))
+                        {
+                            direction = 0;
+                        }
 
-        								//境界線方向：horizon下
-        								else if( (i == by + h - 1 && i != org->height-1 && j != bx && j != bx + w - 1)//yokosita
-        								||(i == by + h - 1 && i != org->height-1 && j == 0)
-        								||(i == by + h - 1 && i != org->height-1 && j == org->width-1))
-        								{
-        									direction = 2;
-        								}
+                        //境界線方向：horizon下
+                        else if ((i == by + h - 1 && i != org->height - 1 && j != bx && j != bx + w - 1) //yokosita
+                                 || (i == by + h - 1 && i != org->height - 1 && j == 0) || (i == by + h - 1 && i != org->height - 1 && j == org->width - 1))
+                        {
+                            direction = 2;
+                        }
 
-        								//境界線方向：vertical右
-        								else if(  (j == bx + w - 1 && j != org->width-1 && i != by && i != by + h -1)//tatemigi
-        								||(j == bx + w - 1 && j != org->width-1 && i == 0)
-        								||(j == bx + w - 1 && j != org->width-1 && i == org->height-1))
-        								{
-        									direction = 1;
-        								}
+                        //境界線方向：vertical右
+                        else if ((j == bx + w - 1 && j != org->width - 1 && i != by && i != by + h - 1) //tatemigi
+                                 || (j == bx + w - 1 && j != org->width - 1 && i == 0) || (j == bx + w - 1 && j != org->width - 1 && i == org->height - 1))
+                        {
+                            direction = 1;
+                        }
 
-        								//境界線方向：vertical左
-        								else if((j == bx && j != 0 && i != by && i != by + h - 1)//tatehidari
-        								||(j == bx && j != 0 && i == 0)
-        								||(j == bx && j != 0 && i == org->height-1))
-        								{
-        									direction = 3;
-        								}
+                        //境界線方向：vertical左
+                        else if ((j == bx && j != 0 && i != by && i != by + h - 1) //tatehidari
+                                 || (j == bx && j != 0 && i == 0) || (j == bx && j != 0 && i == org->height - 1))
+                        {
+                            direction = 3;
+                        }
+
+                        else
+                        {
+                            direction = 0;
+                        }
 
                         get_fvector_blk(dec, i, j, sig_gain, fvector_blk, direction);
                         t = 0;
@@ -294,7 +315,7 @@ int main(int argc, char **argv)
             {
                 for (j = bx; j < bx + w; j++)
                 {
-                    if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+                    if ((((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx)) && (harris->bool_h[i][j] == 0))
                     {
                         //in blk
                         label = cls->val[i][j];
@@ -305,7 +326,7 @@ int main(int argc, char **argv)
                             k = 255;
                         dec->val[i][j] = k;
                     }
-                    else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
+                    else if (((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0)) || (harris->bool_h[i][j] == 1))
                     {
                         //blk boundary
                         label = cls->val[i][j];
@@ -320,6 +341,8 @@ int main(int argc, char **argv)
             }
         }
     }
+    fclose(TUinfo);
+
     printf("PSNR = %.3f (dB)\n", sn_after = calc_snr(org, dec)); /*pfsvmによる輝度補償の時のPSNR*/
     printf("GAIN = %+.3f (dB)\n", sn_after - sn_before);
     printf("SIDE_INFO = %d (bits)\n", side_info);

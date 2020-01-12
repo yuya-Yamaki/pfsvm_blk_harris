@@ -319,7 +319,117 @@ double cpu_time(void)
 /*                                                                     */
 /***********************************************************************/
 
-void set_thresholds_blk(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int num_class, double *th_list_inblk, double *th_list_blk_boundary)
+
+// void set_thresholds_blk(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int num_class, double *th_list_inblk, double *th_list_blk_boundary)
+// {
+//   IMAGE *org, *dec;
+//   int hist_inblk[MAX_DIFF + 1];
+//   int hist_blk_boundary[MAX_DIFF + 1];
+//   int img, i, j, k;
+//   double class_size_inblk;
+//   double class_size_blk_boundary;
+
+//   FILE *TUinfo;
+//   int x, y, w, h;
+//   int cux = 0, cuy = 0;
+//   int bx = 0, by = 0;
+//   char filename[100];
+//   char tmp[1];
+
+//   for (k = 0; k < MAX_DIFF + 1; k++)
+//   {
+//     hist_inblk[k] = 0;
+//     hist_blk_boundary[k] = 0;
+//   }
+//   class_size_inblk = 0;
+//   class_size_blk_boundary = 0;
+//   for (img = 0; img < num_img; img++)
+//   {
+//     org = oimg_list[img];
+//     dec = dimg_list[img];
+//     if (num_img == 1)
+//     {
+//       sprintf(filename, "TUinfo.log");
+//     }
+//     else
+//     {
+//       sprintf(filename, "TUinfo%d.log", img);
+//     }
+//     TUinfo = fopen(filename, "rb");
+
+//     while (fscanf(TUinfo, "%s%d%d%d%d", tmp, &x, &y, &w, &h) != EOF)
+//     {
+//       if (tmp[0] == 'C')
+//       {
+//         cux = x;
+//         cuy = y;
+//       }
+//       else
+//       {
+//         bx = cux + x;
+//         by = cuy + y;
+//         //block毎にラスタスキャン
+//         for (i = by; i < by + h; i++)
+//         {
+//           for (j = bx; j < bx + w; j++)
+//           {
+//             if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+//             {
+//               //in blk
+//               k = org->val[i][j] - dec->val[i][j];
+//               if (k < 0)
+//               k = -k;
+//               if (k > MAX_DIFF)
+//               k = MAX_DIFF;
+//               hist_inblk[k]++;
+//               class_size_inblk++;
+//             }
+//             else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
+//             {
+//               //blk boundary
+//               k = org->val[i][j] - dec->val[i][j];
+//               if (k < 0)
+//               k = -k;
+//               if (k > MAX_DIFF)
+//               k = MAX_DIFF;
+//               hist_blk_boundary[k]++;
+//               class_size_blk_boundary++;
+//             }
+//           }
+//         }
+//       }
+//     }
+//     fclose(TUinfo);
+//   }
+//   for (k = 0; k < MAX_DIFF + 1; k++)
+//   {
+//     printf("%4d%8d\n", k, hist_inblk[k]);
+//   }
+//   printf("\n");
+//   for (k = 0; k < MAX_DIFF + 1; k++)
+//   {
+//     printf("%4d%8d\n", k, hist_blk_boundary[k]);
+//   }
+//   class_size_inblk /= num_class;
+//   class_size_blk_boundary /= num_class;
+//   i = 0;
+//   j = 0;
+//   for (k = 0; k < MAX_DIFF; k++)
+//   {
+//     if (hist_inblk[k] > class_size_inblk * (1 + 2 * i))
+//     {
+//       th_list_inblk[i++] = k + 0.5;
+//     }
+//     if (hist_blk_boundary[k] > class_size_blk_boundary * (1 + 2 * j))
+//     {
+//       th_list_blk_boundary[j++] = k + 0.5;
+//     }
+//     hist_inblk[k + 1] += hist_inblk[k];
+//     hist_blk_boundary[k + 1] += hist_blk_boundary[k];
+//   }
+// }
+
+void set_thresholds_blk_harris(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int num_class, double *th_list_inblk, double *th_list_blk_boundary, HARRIS **harris_list)
 {
   IMAGE *org, *dec;
   int hist_inblk[MAX_DIFF + 1];
@@ -335,6 +445,8 @@ void set_thresholds_blk(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int n
   char filename[100];
   char tmp[1];
 
+  HARRIS *harris;
+
   for (k = 0; k < MAX_DIFF + 1; k++)
   {
     hist_inblk[k] = 0;
@@ -346,6 +458,8 @@ void set_thresholds_blk(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int n
   {
     org = oimg_list[img];
     dec = dimg_list[img];
+    harris = harris_list[img];
+
     if (num_img == 1)
     {
       sprintf(filename, "TUinfo.log");
@@ -372,25 +486,25 @@ void set_thresholds_blk(IMAGE **oimg_list, IMAGE **dimg_list, int num_img, int n
         {
           for (j = bx; j < bx + w; j++)
           {
-            if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+            if ((((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx)) && (harris->bool_h[i][j] == 0))
             {
               //in blk
               k = org->val[i][j] - dec->val[i][j];
               if (k < 0)
-              k = -k;
+                k = -k;
               if (k > MAX_DIFF)
-              k = MAX_DIFF;
+                k = MAX_DIFF;
               hist_inblk[k]++;
               class_size_inblk++;
             }
-            else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
+            else if (((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0)) || (harris->bool_h[i][j] == 1))
             {
               //blk boundary
               k = org->val[i][j] - dec->val[i][j];
               if (k < 0)
-              k = -k;
+                k = -k;
               if (k > MAX_DIFF)
-              k = MAX_DIFF;
+                k = MAX_DIFF;
               hist_blk_boundary[k]++;
               class_size_blk_boundary++;
             }
@@ -458,6 +572,7 @@ int get_fvector_blk(IMAGE *img, int i, int j, double gain, double *fvector, int 
   /*注目画素の再生値＝v0*/
   v0 = img->val[i][j];
   num_nonzero = 0;
+  int tmp;
 
   for(k = 0; k < NUM_FEATURES; k++)
   {
@@ -518,7 +633,7 @@ int slope(IMAGE *img, int i, int j, int blkcorner)
   switch(blkcorner){
     case 1:
     if(slope[0] > slope[3]) direction = 0;
-    else diretion = 3;
+    else direction = 3;
     break;
     case 2:
     if(slope[0] > slope[1]) direction = 0;

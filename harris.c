@@ -23,10 +23,10 @@ HARRIS *alloc_harris(int height, int width)
     int i;
 
     harris = (HARRIS *)calloc(1, sizeof(HARRIS));
-    harris->bool_harris = (int **)calloc(height, sizeof(int));
+    harris->bool_h = (int **)calloc(height, sizeof(int));
     for (i = 0; i < height; i++)
     {
-        harris->bool_harris[i] = (int *)calloc(width, sizeof(int));
+        harris->bool_h[i] = (int *)calloc(width, sizeof(int));
     }
 
     return harris;
@@ -262,15 +262,15 @@ void harris_feature(HARRIS **harris_list, HARRIS *harris, double **harris_R, int
         {
             if (harris_R[i][j] >= th_harris * max)
             {
-                harris->bool_harris[i][j] = 1;
+                harris->bool_h[i][j] = 1;
             }
             else if (harris_R[i][j] <= (-1) * th_harris * max)
             {
-                harris->bool_harris[i][j] = 1;
+                harris->bool_h[i][j] = 1;
             }
             else
             {
-                harris->bool_harris[i][j] = 0;
+                harris->bool_h[i][j] = 0;
             }
         }
     }
@@ -294,10 +294,10 @@ void set_harris(HARRIS *harris, HARRIS **harris_list, IMAGE **oimg_list, int num
     width = org->width;
     maxval = org->maxval;
 
-    harris->bool_harris = (int **)calloc(height, sizeof(int *));
+    harris->bool_h = (int **)calloc(height, sizeof(int *));
     for (i = 0; i < height; i++)
     {
-        harris->bool_harris[i] = (int *)calloc(width, sizeof(int));
+        harris->bool_h[i] = (int *)calloc(width, sizeof(int));
     }
 
     int sobel_x[9] = {
@@ -381,20 +381,20 @@ void harris_feature_for_check(HARRIS **harris_list, HARRIS *harris, HARRIS *harr
             if (harris_R[i][j] >= th_harris * max)
             {
                 //corner
-                harris->bool_harris[i][j] = 1;
-                harris_check->bool_harris[i][j] = 1;
+                harris->bool_h[i][j] = 1;
+                harris_check->bool_h[i][j] = 1;
             }
             else if (harris_R[i][j] <= (-1) * th_harris * max)
             {
                 //edge
-                harris->bool_harris[i][j] = 1;
-                harris_check->bool_harris[i][j] = -1;
+                harris->bool_h[i][j] = 1;
+                harris_check->bool_h[i][j] = -1;
             }
             else
             {
                 //flat
-                harris->bool_harris[i][j] = 0;
-                harris_check->bool_harris[i][j] = 0;
+                harris->bool_h[i][j] = 0;
+                harris_check->bool_h[i][j] = 0;
             }
         }
     }
@@ -424,14 +424,14 @@ void write_harris_yuv(IMAGE *org, HARRIS *harris_check, char *filename, int heig
                     putc(tmp, fp);
                     break;
                 case 1:
-                    if (harris_check->bool_harris[i][j] == -1)
+                    if (harris_check->bool_h[i][j] == -1)
                         tmp = 255;
                     else
                         tmp = 128;
                     putc(tmp, fp);
                     break;
                 case 2:
-                    if (harris_check->bool_harris[i][j] == 1)
+                    if (harris_check->bool_h[i][j] == 1)
                         tmp = 255;
                     else
                         tmp = 128;
@@ -461,17 +461,17 @@ void set_harris_for_check(HARRIS *harris, HARRIS **harris_list, IMAGE **oimg_lis
     width = org->width;
     maxval = org->maxval;
 
-    harris->bool_harris = (int **)calloc(height, sizeof(int *));
+    harris->bool_h = (int **)calloc(height, sizeof(int *));
     for (i = 0; i < height; i++)
     {
-        harris->bool_harris[i] = (int *)calloc(width, sizeof(int));
+        harris->bool_h[i] = (int *)calloc(width, sizeof(int));
     }
 
     harris_check = (HARRIS *)calloc(1, sizeof(HARRIS));
-    harris_check->bool_harris = (int **)calloc(height, sizeof(int *));
+    harris_check->bool_h = (int **)calloc(height, sizeof(int *));
     for (i = 0; i < height; i++)
     {
-        harris_check->bool_harris[i] = (int *)calloc(width, sizeof(int));
+        harris_check->bool_h[i] = (int *)calloc(width, sizeof(int));
     }
 
     int sobel_x[9] = {

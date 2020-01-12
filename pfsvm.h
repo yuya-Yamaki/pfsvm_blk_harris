@@ -3,6 +3,11 @@
 #define MAX_DIFF 40 /*MAX_DIFFERENCE*/
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
 
+/****************harris******************/
+#define th_harris 0.01
+#define lambda 0.04
+/**************************************/
+
 /*英数字一文字（符号なし）（unsigned char）*/
 typedef unsigned char img_t;
 
@@ -14,6 +19,12 @@ typedef struct {
   int maxval;
   img_t **val;
 } IMAGE;
+
+/*******************Harris******************/
+typedef struct {
+  int **bool_h;
+} HARRIS;
+/*******************************************/
 
 /*関数の宣言*/
 void *alloc_mem(size_t);
@@ -30,7 +41,37 @@ int get_fvector(IMAGE *, int, int, double, double *);
 double cpu_time(void);
 
 /****************************blk information****************************/
-void set_thresholds_blk(IMAGE **, IMAGE **, int, int, double *, double *);
+//void set_thresholds_blk(IMAGE **, IMAGE **, int, int, double *, double *);
+void set_thresholds_blk_harris(IMAGE **, IMAGE **, int, int, double *, double *, HARRIS **);
 int get_fvector_blk(IMAGE *, int, int, double, double *, int);
 int slope(IMAGE *, int, int, int);
 /***********************************************************************/
+
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/*                                                                                                                */
+/*                                                                                                                */
+/*                                                                                                                */
+/*                                             Harris corner detection                                            */
+//harris.c
+HARRIS *alloc_harris(int, int);
+IMAGE *lowpassGauss_org(IMAGE *, double *, int, int, int);
+double **convolve(IMAGE *, int *, int, int);
+double **convolve_Gauss(double **, double *, int, int);
+double **square(double **, int, int);
+double **dxdy_calc(double **, double **, int, int);
+double **harris_calc(double **, double **, double **, int, int);
+void harris_feature(HARRIS **, HARRIS *, double **, int, int, int);
+void set_harris(HARRIS *, HARRIS **, IMAGE **, int);
+//pfsvm_common.c
+void set_thresholds_harris(IMAGE **, IMAGE **, int, int, double *, double *, HARRIS **);
+//harris_for_check
+void harris_feature_for_check(HARRIS **, HARRIS *, HARRIS *, double **, int, int, int);
+void set_harris_for_check(HARRIS *, HARRIS **, IMAGE **, int);
+void write_harris_yuv(IMAGE *, HARRIS *, char *, int, int, int);
+/*                                                                                                                */
+/*                                                                                                                */
+/******************************************************************************************************************/
+/******************************************************************************************************************/
+/******************************************************************************************************************/

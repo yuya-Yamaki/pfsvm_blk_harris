@@ -28,7 +28,7 @@ struct svm_node *x_space_blk;
 
 int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_list)
 {
-	#ifdef LEAVE_ONE_OUT
+#ifdef LEAVE_ONE_OUT
 	FILE *fp;
 	DIR *dir;
 	struct dirent *dp;
@@ -43,7 +43,7 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 	while ((dp = readdir(dir)) != NULL)
 	{
 		if (strncmp(dp->d_name + strlen(dp->d_name) - 4, ".pgm", 4) != 0)
-		continue;
+			continue;
 		strncpy(org_img, org_dir, 255);
 		if (org_img[strlen(org_img) - 1] != '/')
 		{
@@ -58,7 +58,7 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 		strcat(dec_img, dp->d_name);
 		strcpy(dec_img + strlen(dec_img) - 4, "-dec.pgm");
 		if ((fp = fopen(dec_img, "r")) == NULL)
-		continue;
+			continue;
 		fclose(fp);
 		printf("%s %s\n", org_img, dec_img);
 		oimg_list[num_img] = read_pgm(org_img);
@@ -66,11 +66,11 @@ int set_images(char *org_dir, char *dec_dir, IMAGE **oimg_list, IMAGE **dimg_lis
 		num_img++;
 	}
 	return (num_img);
-	#else
+#else
 	oimg_list[0] = read_pgm(org_dir);
 	dimg_list[0] = read_pgm(dec_dir);
 	return (1);
-	#endif
+#endif
 }
 
 int main(int argc, char **argv)
@@ -98,10 +98,14 @@ int main(int argc, char **argv)
 	int cux = 0, cuy = 0;
 	int bx = 0, by = 0;
 	char filename[100];
+	int direction = 0;
+	int blkcorner_x = 0, blkcorner_y = 0, blkcorner = 0;
 	/***********************************************************************/
-	//下のやつはコピー用あとで消す
-	/****************************blk information****************************/
-	/***********************************************************************/
+
+	/*******************Harris******************/
+	HARRIS *harris;
+	HARRIS *harris_list[MAX_IMAGE];
+	/*******************************************/
 
 	cpu_time();
 	setbuf(stdout, 0);
@@ -111,7 +115,7 @@ int main(int argc, char **argv)
 		{
 			switch (argv[i][1])
 			{
-				case 'L':
+			case 'L':
 				num_class = atoi(argv[++i]);
 				if (num_class < 3 || num_class > MAX_CLASS || (num_class % 2) == 0)
 				{
@@ -119,16 +123,16 @@ int main(int argc, char **argv)
 					exit(1);
 				}
 				break;
-				case 'C':
+			case 'C':
 				svm_c = atof(argv[++i]);
 				break;
-				case 'G':
+			case 'G':
 				svm_gamma = atof(argv[++i]);
 				break;
-				case 'S':
+			case 'S':
 				sig_gain = atof(argv[++i]);
 				break;
-				default:
+			default:
 				fprintf(stderr, "Unknown option: %s!\n", argv[i]);
 				exit(1);
 			}
@@ -155,12 +159,12 @@ int main(int argc, char **argv)
 	}
 	if (modelfile == NULL || modelfile_blk == NULL)
 	{
-		#ifdef LEAVE_ONE_OUT
+#ifdef LEAVE_ONE_OUT
 		printf("Usage: %s [options] original_dir decoded_dir model.svm model_blk.svm\n",
-		#else
+#else
 		printf("Usage: %s [options] original.pgm decoded.pgm model.svm model_blk.svm\n",
-		#endif
-		argv[0]);
+#endif
+			   argv[0]);
 		printf("    -L num  The number of classes [%d]\n", num_class);
 		printf("    -C num  Penalty parameter for SVM [%f]\n", svm_c);
 		printf("    -G num  Gamma parameter for SVM [%f]\n", svm_gamma);
@@ -169,7 +173,14 @@ int main(int argc, char **argv)
 	}
 
 	num_img = set_images(org_dir, dec_dir, oimg_list, dimg_list);
-	set_thresholds_blk(oimg_list, dimg_list, num_img, num_class, th_list, th_list_blk);
+
+	/*******************Harris******************/
+	harris = (HARRIS *)calloc(1, sizeof(HARRIS));
+	//set_harris(harris, harris_list, oimg_list, num_img);
+	set_harris_for_check(harris, harris_list, oimg_list, num_img);
+	/*******************************************/
+
+	set_thresholds_blk_harris(oimg_list, dimg_list, num_img, num_class, th_list, th_list_blk, harris_list);
 	printf("Number of classes = %d\n", num_class);
 	printf("Number of training images = %d\n", num_img);
 	printf("Thresholds = {%.1f", th_list[0]);
@@ -196,6 +207,8 @@ int main(int argc, char **argv)
 	{
 		org = oimg_list[img];
 		dec = dimg_list[img];
+		harris = harris_list[img];
+
 		sprintf(filename, "TUinfo%d.log", img);
 		TUinfo = fopen(filename, "rb");
 
@@ -215,20 +228,17 @@ int main(int argc, char **argv)
 				{
 					for (j = bx; j < bx + w; j++)
 					{
-						if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+						if (drand48() < SAMPLE_RATIO)
 						{
-							//in blk
-							if (drand48() < SAMPLE_RATIO)
+							if ((((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx)) && (harris->bool_h[i][j] == 0))
 							{
+								//in blk
 								elements += get_fvector(dec, i, j, sig_gain, fvector);
 								prob.l++;
 							}
-						}
-						else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
-						{
-							//blk boundary
-							if (drand48() < SAMPLE_RATIO)
+							else if (((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0)) || (harris->bool_h[i][j] == 1))
 							{
+								//blk boundary
 								elements_blk += get_fvector(dec, i, j, sig_gain, fvector_blk);
 								prob_blk.l++;
 							}
@@ -236,9 +246,9 @@ int main(int argc, char **argv)
 					}
 				}
 			}
-		}
+		} //while
 		fclose(TUinfo);
-	}
+	} //img
 	printf("Number of samples in blk = %d (%d)\n", prob.l, (int)elements);
 	printf("Numver of samples blk boundary = %d (%d)\n", prob_blk.l, (int)elements_blk);
 
@@ -304,6 +314,7 @@ int main(int argc, char **argv)
 	{
 		org = oimg_list[img];
 		dec = dimg_list[img];
+		harris = harris_list[img];
 
 		sprintf(filename, "TUinfo%d.log", img);
 		TUinfo = fopen(filename, "rb");
@@ -325,10 +336,9 @@ int main(int argc, char **argv)
 					{
 						if (drand48() < SAMPLE_RATIO)
 						{
-							if (((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx))
+							if ((((j != bx + w - 1) && (j != bx) && (i != by + h - 1) && (i != by)) || (j == 0 && i == 0) || (j == org->width - 1 && i == 0) || (j == 0 && i == org->height - 1) || (j == org->width - 1 && i == org->height - 1) || (j == 0 && i != by + h - 1 && i != by) || (i == 0 && j != bx + w - 1 && j != bx) || (j == org->width - 1 && i != by + h - 1 && i != by) || (i == org->height - 1 && j != bx + w - 1 && j != bx)) && (harris->bool_h[i][j] == 0))
 							{
 								//in blk
-
 								label = get_label(org, dec, i, j, num_class, th_list);
 								cls[label]++;
 								prob.y[m] = label;
@@ -347,61 +357,70 @@ int main(int argc, char **argv)
 								m++;
 							}
 
-							else if ((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0))
+							else if (((j == bx + w - 1 && j != org->width - 1) || (j == bx && j != 0) || (i == by + h - 1 && i != org->height - 1) || (i == by && i != 0)) || (harris->bool_h[i][j] == 1))
 							{
 								//blk boundary
-
 								//ブロックの隅であるとき
-								if( (j == bx && i == by && j != 0 && i != 0)
-								||(j == bx && i == by + h - 1 && j != 0 && i != org->height-1)
-								||(j == bx + w - 1 && i == by && j != org->width-1 && i != 0)
-								||(j == bx + w - 1 && i == by + h - 1 && j != org->width-1 && i != org->height-1))
+								if ((j == bx && i == by && j != 0 && i != 0) || (j == bx && i == by + h - 1 && j != 0 && i != org->height - 1) || (j == bx + w - 1 && i == by && j != org->width - 1 && i != 0) || (j == bx + w - 1 && i == by + h - 1 && j != org->width - 1 && i != org->height - 1))
 								{
 									blkcorner_x = j % 4;
 									blkcorner_y = i % 4;
-									switch(blkcorner_x){
-										case 0:
-										if(blkcorner_y == 0){blkcorner = 1;}//左上
-										else{blkcorner = 3;}//左下
+									switch (blkcorner_x)
+									{
+									case 0:
+										if (blkcorner_y == 0)
+										{
+											blkcorner = 1;
+										} //左上
+										else
+										{
+											blkcorner = 3;
+										} //左下
 										break;
-										case 3:
-										if(blkcorner_y == 0){blkcorner = 2;}//右上
-										else{blkcorner = 4;}//右下
+									case 3:
+										if (blkcorner_y == 0)
+										{
+											blkcorner = 2;
+										} //右上
+										else
+										{
+											blkcorner = 4;
+										} //右下
 										break;
 									}
-									direction = slope(org, i, j, blkcorner)
+									direction = slope(org, i, j, blkcorner);
 								}
 
 								//境界線方向：horizon上
-								if( (i == by && i != 0 && j != bx && j != bx + w - 1)
-								||(i == by && i != 0 && j == 0)
-								||(i == by && i != 0 && j == org->width-1))
+								else if ((i == by && i != 0 && j != bx && j != bx + w - 1) || (i == by && i != 0 && j == 0) || (i == by && i != 0 && j == org->width - 1))
 								{
 									direction = 0;
 								}
 
 								//境界線方向：horizon下
-								else if( (i == by + h - 1 && i != org->height-1 && j != bx && j != bx + w - 1)//yokosita
-								||(i == by + h - 1 && i != org->height-1 && j == 0)
-								||(i == by + h - 1 && i != org->height-1 && j == org->width-1))
+								else if ((i == by + h - 1 && i != org->height - 1 && j != bx && j != bx + w - 1) //yokosita
+										 || (i == by + h - 1 && i != org->height - 1 && j == 0) || (i == by + h - 1 && i != org->height - 1 && j == org->width - 1))
 								{
 									direction = 2;
 								}
 
 								//境界線方向：vertical右
-								else if(  (j == bx + w - 1 && j != org->width-1 && i != by && i != by + h -1)//tatemigi
-								||(j == bx + w - 1 && j != org->width-1 && i == 0)
-								||(j == bx + w - 1 && j != org->width-1 && i == org->height-1))
+								else if ((j == bx + w - 1 && j != org->width - 1 && i != by && i != by + h - 1) //tatemigi
+										 || (j == bx + w - 1 && j != org->width - 1 && i == 0) || (j == bx + w - 1 && j != org->width - 1 && i == org->height - 1))
 								{
 									direction = 1;
 								}
 
 								//境界線方向：vertical左
-								else if((j == bx && j != 0 && i != by && i != by + h - 1)//tatehidari
-								||(j == bx && j != 0 && i == 0)
-								||(j == bx && j != 0 && i == org->height-1))
+								else if ((j == bx && j != 0 && i != by && i != by + h - 1) //tatehidari
+										 || (j == bx && j != 0 && i == 0) || (j == bx && j != 0 && i == org->height - 1))
 								{
 									direction = 3;
+								}
+
+								else
+								{
+									direction = 0;
 								}
 
 								label = get_label(org, dec, i, j, num_class, th_list_blk);
@@ -421,12 +440,13 @@ int main(int argc, char **argv)
 								x_space_blk[t++].index = -1;
 								s++;
 							}
-						}// if drand
+						} // if drand
 					}
 				}
 			}
-		}
-	}//for img
+		}//while
+		fclose(TUinfo);
+	} //for img
 
 	for (k = 0; k < num_class; k++)
 	{
